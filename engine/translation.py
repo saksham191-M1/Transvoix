@@ -46,7 +46,7 @@ class TranslationEngine:
 
     @lru_cache(maxsize=2048)
     def _translate_cached(self, text: str, source: str, target: str) -> str:
-        """Perform cached translate call using GoogleTranslator."""
+        """Perform cached translate call using GoogleTranslator with MyMemory fallback."""
         # Map short code zh to zh-CN for deep-translator compatibility
         src_mapped = "zh-CN" if source == "zh" else source
         tgt_mapped = "zh-CN" if target == "zh" else target
@@ -56,9 +56,31 @@ class TranslationEngine:
         try:
             translator = GoogleTranslator(source=src_mapped, target=tgt_mapped)
             return translator.translate(text)
-        except Exception as e:
-            logger.error(f"Translation error ({src_mapped} -> {tgt_mapped}): {e}")
-            return text  # Fallback to source text
+        except Exception as google_err:
+            logger.warning(f"Google Translation failed ({src_mapped} -> {tgt_mapped}): {google_err}. Trying MyMemoryTranslator...")
+            try:
+                from deep_translator import MyMemoryTranslator
+                
+                # MyMemory expects specific regional codes/locales from its supported list
+                mymemory_map = {
+                    "en": "en-US", "es": "es-ES", "fr": "fr-FR", "de": "de-DE",
+                    "it": "it-IT", "pt": "pt-PT", "ja": "ja-JP", "ko": "ko-KR",
+                    "zh": "zh-CN", "hi": "hi-IN", "ar": "ar-SA", "ru": "ru-RU",
+                    "tr": "tr-TR", "vi": "vi-VN", "nl": "nl-NL", "pl": "pl-PL",
+                    "sv": "sv-SE", "no": "nb-NO", "da": "da-DK", "fi": "fi-FI"
+                }
+                
+                src_clean = src_mapped.split("-")[0].lower()
+                tgt_clean = tgt_mapped.split("-")[0].lower()
+                
+                src_mymemory = mymemory_map.get(src_clean, "en-US")
+                tgt_mymemory = mymemory_map.get(tgt_clean, "en-US")
+                
+                translator = MyMemoryTranslator(source=src_mymemory, target=tgt_mymemory)
+                return translator.translate(text)
+            except Exception as mymemory_err:
+                logger.error(f"All translation backends failed for ({src_mapped} -> {tgt_mapped}): {mymemory_err}")
+                return text  # Fallback to source text
 
     def translate(self, text: str, source_lang: str, target_lang: str, dictionary_id: Optional[str] = None) -> str:
         """Translate text with custom dictionary override."""
