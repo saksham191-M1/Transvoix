@@ -1,0 +1,106 @@
+:root {
+  /* Fonts */
+  --font-family-body: 'Plus Jakarta Sans', sans-serif;
+  --font-family-heading: 'Plus Jakarta Sans', sans-serif;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-round: 50%;
+
+  /* Dark Theme Tokens (Default) */
+  --bg-primary: #05111d;
+  --bg-secondary: #0d2a35;
+  --bg-tertiary: #102720;
+  --bg-glass: rgba(8, 24, 38, 0.72);
+  --border-glass: rgba(186, 230, 253, 0.16);
+  --border-glass-hover: rgba(249, 115, 22, 0.46);
+  
+  --text-primary: #f3f4f6;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  
+  --accent-primary: #0ea5e9;
+  --accent-secondary: #38bdf8;
+  --accent-tertiary: #14b8a6;
+  --accent-success: #22c55e;
+  --accent-cta: #f97316;
+  --accent-cta-hover: #ea580c;
+  --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #14b8a6 48%, #f97316 100%);
+  --accent-soft: rgba(14, 165, 233, 0.14);
+  --accent-warm-soft: rgba(249, 115, 22, 0.14);
+  
+  --shadow-main: 0 18px 50px 0 rgba(0, 0, 0, 0.28);
+  --shadow-glow: 0 24px 70px rgba(14, 165, 233, 0.16);
+  --blur-amount: 16px;
+}
+
+[data-theme="light"] {
+  /* Light Theme Tokens */
+  --bg-primary: #f0f9ff;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #ecfdf5;
+  --bg-glass: rgba(255, 255, 255, 0.86);
+  --border-glass: rgba(14, 74, 110, 0.12);
+  --border-glass-hover: rgba(249, 115, 22, 0.34);
+  
+  --text-primary: #0c4a6e;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  
+  --accent-primary: #0284c7;
+  --accent-secondary: #0ea5e9;
+  --accent-tertiary: #0f766e;
+  --accent-success: #16a34a;
+  --accent-cta: #f97316;
+  --accent-cta-hover: #ea580c;
+  --accent-gradient: linear-gradient(135deg, #0ea5e9 0%, #14b8a6 50%, #f97316 100%);
+  --accent-soft: rgba(14, 165, 233, 0.12);
+  --accent-warm-soft: rgba(249, 115, 22, 0.12);
+  
+  --shadow-main: 0 18px 44px 0 rgba(12, 74, 110, 0.1);
+  --shadow-glow: 0 24px 60px rgba(14, 165, 233, 0.14);
+  --blur-amount: 12px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+body {
+  font-family: var(--font-family-body);
+  background-color: var(--bg-primary);
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 12% 8%, rgba(56, 189, 248, 0.2), transparent 30rem),
+    radial-gradient(circle at 92% 18%, rgba(249, 115, 22, 0.13), transparent 28rem),
+    linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-tertiary) 48%, var(--bg-secondary) 100%);
+  background-size: 48px 48px, 48px 48px, auto, auto, auto;
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-heading);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+a, button {
+  -webkit-tap-highlight-color: transparent;
+}

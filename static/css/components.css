@@ -1,0 +1,242 @@
+/* Glassmorphism Card Base */
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-main);
+  padding: var(--space-lg);
+  color: var(--text-primary);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--border-glass-hover);
+  transform: translateY(-2px);
+}
+
+/* Navigation */
+.site-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  width: min(1180px, calc(100% - 32px));
+  margin: 16px auto 0;
+  padding: 12px 16px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-main);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  position: sticky;
+  top: 16px;
+  z-index: 20;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: max-content;
+  cursor: pointer;
+}
+
+.brand-mark img {
+  width: 32px;
+  height: 32px;
+}
+
+.brand-mark h1 {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  text-decoration: none;
+  font-family: var(--font-family-heading);
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+/* Premium Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-family: var(--font-family-heading);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  gap: var(--space-sm);
+}
+
+.btn-primary {
+  background: var(--accent-cta);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.28);
+}
+
+.btn-primary:hover {
+  background: var(--accent-cta-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border-glass);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-secondary);
+}
+
+.btn-lg {
+  min-height: 48px;
+  padding: 12px 22px;
+  font-size: 1rem;
+}
+
+/* Glass Inputs */
+.form-input, .form-select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.form-field label {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.form-field label span {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--accent-secondary);
+}
+
+.theme-toggle-btn svg,
+.icon-button svg,
+.btn svg,
+.feature-icon svg,
+.pair-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.icon-button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-secondary);
+}
+
+.text-button {
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--accent-secondary);
+  cursor: pointer;
+  font-family: var(--font-family-heading);
+  font-weight: 700;
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible,
+.theme-toggle-btn:focus-visible,
+.icon-button:focus-visible,
+.text-button:focus-visible,
+.form-input:focus-visible,
+.form-select:focus-visible {
+  outline: 3px solid rgba(249, 115, 22, 0.45);
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .site-navbar {
+    align-items: flex-start;
+    flex-direction: column;
+    width: min(100% - 24px, 1180px);
+    top: 12px;
+  }
+
+  .site-nav {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}

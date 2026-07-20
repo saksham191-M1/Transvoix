@@ -12,7 +12,8 @@ from routes import (
     page_routes,
     analytics_routes,
     dictionary_routes,
-    recording_routes
+    recording_routes,
+    tts_routes
 )
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
@@ -37,6 +38,7 @@ app.include_router(websocket_routes.router)
 app.include_router(analytics_routes.router)
 app.include_router(dictionary_routes.router)
 app.include_router(recording_routes.router)
+app.include_router(tts_routes.router)
 app.include_router(page_routes.router)
 
 @app.on_event("startup")

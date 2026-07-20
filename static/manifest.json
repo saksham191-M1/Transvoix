@@ -1,0 +1,16 @@
+{
+  "short_name": "TransVoix",
+  "name": "TransVoix Universal Translator",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/app",
+  "background_color": "#0b0d19",
+  "theme_color": "#6366f1",
+  "display": "standalone",
+  "orientation": "portrait"
+}
