@@ -4,24 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TransVoix - Universal Real-Time AI Communication Platform</title>
-  
-  <!-- Fonts -->
+  <meta name="description" content="Break every language barrier in real time. TransVoix uses Grok AI and Neural TTS to translate live speech across 50+ languages instantly.">
+
+  <!-- Fonts: Space Grotesk (headings) + DM Sans (body) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+
   <!-- Manifest -->
   <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  
+
   <!-- Styles -->
   <link rel="stylesheet" href="/static/css/design-tokens.css">
   <link rel="stylesheet" href="/static/css/components.css">
   <link rel="stylesheet" href="/static/css/layouts.css">
   <link rel="stylesheet" href="/static/css/animations.css">
+
+  <!-- GSAP + ScrollTrigger (loaded before module so it's available globally) -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
 </head>
 <body>
-  
+
   <div id="app-viewport">
     <!-- Dynamic SPA view injection -->
   </div>
