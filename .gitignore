@@ -19,6 +19,13 @@ data/
 .env
 .env.*
 
-# OS files
+# Logs and server output
+*.log
+server.err.log
+server.out.log
+
+# OS & Editor files
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
