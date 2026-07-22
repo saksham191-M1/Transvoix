@@ -17,3 +17,5 @@ edge-tts>=7.2.8
 deepl>=1.30.0
 faster-whisper>=1.2.1
 openai>=2.46.0
+email-validator>=2.0.0
+
