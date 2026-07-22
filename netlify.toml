@@ -1,9 +1,9 @@
 [build]
-  publish = "."
+  publish = "static"
 
 [[redirects]]
-  from = "/"
-  to = "/static/index.html"
+  from = "/static/*"
+  to = "/:splat"
   status = 200
 
 [[redirects]]
@@ -18,5 +18,5 @@
 
 [[redirects]]
   from = "/*"
-  to = "/static/index.html"
+  to = "/index.html"
   status = 200
