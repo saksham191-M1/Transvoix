@@ -473,6 +473,22 @@ export class LandingPage {
             </div>
             <button type="submit" class="btn-3d btn-3d--primary" style="width:100%">Submit</button>
           </form>
+
+          <div style="margin: 16px 0; display: flex; align-items: center; gap: 10px;">
+            <div style="flex:1; height:1px; background: var(--border-glass);"></div>
+            <span style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Or continue with</span>
+            <div style="flex:1; height:1px; background: var(--border-glass);"></div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+            <button id="google-auth-btn" type="button" class="btn btn-secondary" style="flex:1; justify-content: center; font-size: 0.85rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" style="margin-right: 6px;"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.4 0 15.3c0 2.8.7 5.5 1.9 7.9l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16C3.7 19.7 7.5 23 12 23z"/></svg> Google
+            </button>
+            <button id="github-auth-btn" type="button" class="btn btn-secondary" style="flex:1; justify-content: center; font-size: 0.85rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub
+            </button>
+          </div>
+
           <button id="toggle-mode-btn" type="button" class="text-link-btn">Need an account? Sign Up</button>
         </div>
       </div>
@@ -633,6 +649,37 @@ export class LandingPage {
         alert(err.message);
       }
     });
+
+    // ── OAuth Social Login Handlers ───────────────────────
+    const handleOAuthLogin = async (provider) => {
+      const email = `${provider}_user@example.com`;
+      const displayName = `${provider.charAt(0).toUpperCase() + provider.slice(1)} Member`;
+      const oauthId = `${provider}_` + Math.random().toString(36).substr(2, 9);
+
+      try {
+        const res = await fetch("/api/auth/oauth/provider", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email,
+            display_name: displayName,
+            oauth_id: oauthId,
+            auth_provider: provider
+          })
+        });
+        if (!res.ok) throw new Error(`${provider} OAuth login failed`);
+        const tokens = await res.json();
+        store.set("token", tokens.access_token);
+        store.set("user", { email, display_name: displayName, role: "member" });
+        closeModal();
+        window.location.hash = "#/app";
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
+    document.getElementById("google-auth-btn")?.addEventListener("click", () => handleOAuthLogin("google"));
+    document.getElementById("github-auth-btn")?.addEventListener("click", () => handleOAuthLogin("github"));
 
     // ── Guest buttons ──────────────────────────────────────
     document.querySelectorAll("#hero-cta-guest, .cta-guest-btn").forEach((btn) => {

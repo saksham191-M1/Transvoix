@@ -117,3 +117,73 @@ async def get_current_user(token: str):
 async def get_user_preferences(user_id: str):
     return await adaptive_learner.get_learned_preferences(user_id)
 
+
+class OAuthLoginRequest(BaseModel):
+    email: EmailStr
+    display_name: str
+    oauth_id: str
+    auth_provider: str  # 'google' or 'github'
+
+
+@router.post("/oauth/provider", response_model=TokenResponse)
+async def oauth_provider_login(data: OAuthLoginRequest):
+    """
+    Handles Google & GitHub Social OAuth2 Sign-In.
+    Creates or fetches user in database and issues JWT access token.
+    """
+    async for db in get_db():
+        # Check if user already exists
+        async with db.execute(
+            "SELECT id, email, display_name FROM users WHERE email = ?", 
+            (data.email,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            
+        if row:
+            user_id, email, display_name = row
+            # Update oauth_id and auth_provider if not set
+            await db.execute(
+                "UPDATE users SET auth_provider = ?, oauth_id = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?",
+                (data.auth_provider, data.oauth_id, user_id)
+            )
+            await db.commit()
+        else:
+            # Create new user for OAuth
+            user_id = str(uuid.uuid4())
+            dummy_pwd = hash_password(str(uuid.uuid4()))
+            await db.execute(
+                """INSERT INTO users (id, email, password_hash, display_name, auth_provider, oauth_id)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (user_id, data.email, dummy_pwd, data.display_name, data.auth_provider, data.oauth_id)
+            )
+            
+            # Initialize default language profile
+            profile_id = str(uuid.uuid4())
+            await db.execute(
+                """INSERT INTO language_profiles (id, user_id, native_language, preferred_listening_language, spoken_languages, understood_languages)
+                VALUES (?, ?, 'en', 'en', '[]', '[]')""",
+                (profile_id, user_id)
+            )
+            await db.commit()
+
+        # Issue JWT Access & Refresh Tokens
+        access_token = create_access_token(subject=user_id)
+        refresh_token = create_refresh_token(subject=user_id)
+
+        # Save refresh token hash
+        from hashlib import sha256
+        token_id = str(uuid.uuid4())
+        token_hash = sha256(refresh_token.encode()).hexdigest()
+
+        await db.execute(
+            "INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, datetime('now', '+7 days'))",
+            (token_id, user_id, token_hash)
+        )
+        await db.commit()
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }
+    raise HTTPException(status_code=500, detail="Database connection failed")
+
