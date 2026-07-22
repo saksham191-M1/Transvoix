@@ -1,10 +1,5 @@
 [build]
-  publish = "static"
-
-[[redirects]]
-  from = "/static/*"
-  to = "/:splat"
-  status = 200
+  publish = "."
 
 [[redirects]]
   from = "/api/*"
