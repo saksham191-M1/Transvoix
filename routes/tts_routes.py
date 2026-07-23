@@ -36,11 +36,13 @@ EDGE_VOICE_MAP = {
 async def generate_tts(
     text: str = Query(..., min_length=1),
     lang: str = Query("en"),
-    gender: str = Query("female")
+    gender: str = Query("female"),
+    pitch: str = Query("+0Hz"),
+    rate: str = Query("+0%")
 ):
     """
     Generate neural MP3 audio stream for translated text.
-    Supports gender selection ('female' or 'male') for all 50+ languages.
+    Supports gender selection ('female' or 'male') and SSML pitch/rate modulation for 50+ languages.
     """
     clean_lang = lang.split("-")[0].lower()
     clean_gender = gender.lower() if gender.lower() in ["female", "male"] else "female"
@@ -48,9 +50,9 @@ async def generate_tts(
     lang_voices = EDGE_VOICE_MAP.get(clean_lang, EDGE_VOICE_MAP["en"])
     voice = lang_voices.get(clean_gender, lang_voices.get("female"))
     
-    # 1. Try Microsoft Edge Neural Voice (High quality, realistic)
+    # 1. Try Microsoft Edge Neural Voice with dynamic SSML pitch & rate modulation
     try:
-        communicate = edge_tts.Communicate(text, voice)
+        communicate = edge_tts.Communicate(text, voice, pitch=pitch, rate=rate)
         audio_data = bytearray()
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
