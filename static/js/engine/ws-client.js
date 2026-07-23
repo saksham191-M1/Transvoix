@@ -11,9 +11,16 @@ export class WebSocketClient {
   }
 
   connect() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    const url = `${protocol}//${host}/ws/session/${this.sessionId}?participant_id=${this.participantId}&display_name=${encodeURIComponent(this.displayName)}&spoken_lang=${this.spokenLang}&listening_lang=${this.listeningLang}`;
+    let wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    let wsHost = window.location.host;
+
+    // Direct WebSocket connection when hosted on Netlify, Vercel, or cloud proxies
+    if (wsHost.includes("netlify.app") || wsHost.includes("vercel.app") || wsHost.includes("onrender.com")) {
+      wsProtocol = "wss:";
+      wsHost = "transvoix-backend.onrender.com";
+    }
+
+    const url = `${wsProtocol}//${wsHost}/ws/session/${this.sessionId}?participant_id=${this.participantId}&display_name=${encodeURIComponent(this.displayName)}&spoken_lang=${this.spokenLang}&listening_lang=${this.listeningLang}`;
     
     this.ws = new WebSocket(url);
 
