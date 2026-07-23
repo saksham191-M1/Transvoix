@@ -374,8 +374,9 @@ export class TranslationRoomPage {
     // 1. Play Server Neural TTS (Microsoft Edge Neural Voices)
     const playServerNeuralTTS = () => {
       try {
+        const gender = store.get("voice_gender") || "female";
         const encodedText = encodeURIComponent(text);
-        const ttsUrl = `/api/tts?text=${encodedText}&lang=${cleanLang}`;
+        const ttsUrl = `/api/tts?text=${encodedText}&lang=${cleanLang}&gender=${gender}`;
         const audio = new Audio(ttsUrl);
         audio.play().catch(err => {
           console.warn("Server Neural TTS playback notice:", err.message || err);

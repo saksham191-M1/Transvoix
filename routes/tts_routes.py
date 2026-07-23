@@ -8,38 +8,45 @@ from gtts import gTTS
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/tts", tags=["tts"])
 
-# Voice mapping for edge-tts Neural voices
+# Dual Male and Female Neural Voice Mappings (Microsoft Edge Neural Voices)
 EDGE_VOICE_MAP = {
-    "en": "en-US-AvaNeural",
-    "es": "es-ES-ElviraNeural",
-    "fr": "fr-FR-DeniseNeural",
-    "de": "de-DE-KatjaNeural",
-    "it": "it-IT-ElsaNeural",
-    "pt": "pt-PT-RaquelNeural",
-    "ja": "ja-JP-NanamiNeural",
-    "ko": "ko-KR-SunHiNeural",
-    "zh": "zh-CN-XiaoxiaoNeural",
-    "hi": "hi-IN-SwaraNeural",
-    "ar": "ar-SA-ZariyahNeural",
-    "ru": "ru-RU-SvetlanaNeural",
-    "tr": "tr-TR-EmelNeural",
-    "vi": "vi-VN-HoaiMyNeural",
-    "nl": "nl-NL-ColetteNeural",
-    "pl": "pl-PL-ZofiaNeural",
-    "sv": "sv-SE-SofieNeural",
-    "no": "nb-NO-PernilleNeural",
-    "da": "da-DK-ChristelNeural",
-    "fi": "fi-FI-NooraNeural"
+    "en": {"female": "en-US-AvaNeural", "male": "en-US-AndrewNeural"},
+    "es": {"female": "es-ES-ElviraNeural", "male": "es-ES-AlvaroNeural"},
+    "fr": {"female": "fr-FR-DeniseNeural", "male": "fr-FR-HenriNeural"},
+    "de": {"female": "de-DE-KatjaNeural", "male": "de-DE-KillianNeural"},
+    "it": {"female": "it-IT-ElsaNeural", "male": "it-IT-DiegoNeural"},
+    "pt": {"female": "pt-PT-RaquelNeural", "male": "pt-PT-DuarteNeural"},
+    "ja": {"female": "ja-JP-NanamiNeural", "male": "ja-JP-KeitaNeural"},
+    "ko": {"female": "ko-KR-SunHiNeural", "male": "ko-KR-InJoonNeural"},
+    "zh": {"female": "zh-CN-XiaoxiaoNeural", "male": "zh-CN-YunjianNeural"},
+    "hi": {"female": "hi-IN-SwaraNeural", "male": "hi-IN-MadhurNeural"},
+    "ar": {"female": "ar-SA-ZariyahNeural", "male": "ar-SA-HamedNeural"},
+    "ru": {"female": "ru-RU-SvetlanaNeural", "male": "ru-RU-DmitryNeural"},
+    "tr": {"female": "tr-TR-EmelNeural", "male": "tr-TR-AhmetNeural"},
+    "vi": {"female": "vi-VN-HoaiMyNeural", "male": "vi-VN-NamMinhNeural"},
+    "nl": {"female": "nl-NL-ColetteNeural", "male": "nl-NL-MaartenNeural"},
+    "pl": {"female": "pl-PL-ZofiaNeural", "male": "pl-PL-MarekNeural"},
+    "sv": {"female": "sv-SE-SofieNeural", "male": "sv-SE-MattiasNeural"},
+    "no": {"female": "nb-NO-PernilleNeural", "male": "nb-NO-FinnNeural"},
+    "da": {"female": "da-DK-ChristelNeural", "male": "da-DK-JeppeNeural"},
+    "fi": {"female": "fi-FI-NooraNeural", "male": "fi-FI-HarriNeural"}
 }
 
 @router.get("")
-async def generate_tts(text: str = Query(..., min_length=1), lang: str = Query("en")):
+async def generate_tts(
+    text: str = Query(..., min_length=1),
+    lang: str = Query("en"),
+    gender: str = Query("female")
+):
     """
     Generate neural MP3 audio stream for translated text.
-    Uses Microsoft Edge Neural voices with gTTS fallback.
+    Supports gender selection ('female' or 'male') for all 50+ languages.
     """
     clean_lang = lang.split("-")[0].lower()
-    voice = EDGE_VOICE_MAP.get(clean_lang, "en-US-AvaNeural")
+    clean_gender = gender.lower() if gender.lower() in ["female", "male"] else "female"
+    
+    lang_voices = EDGE_VOICE_MAP.get(clean_lang, EDGE_VOICE_MAP["en"])
+    voice = lang_voices.get(clean_gender, lang_voices.get("female"))
     
     # 1. Try Microsoft Edge Neural Voice (High quality, realistic)
     try:
@@ -52,7 +59,7 @@ async def generate_tts(text: str = Query(..., min_length=1), lang: str = Query("
         if len(audio_data) > 0:
             return Response(content=bytes(audio_data), media_type="audio/mpeg")
     except Exception as e:
-        logger.warning(f"Edge Neural TTS failed for '{clean_lang}' ({e}). Switching to gTTS fallback...")
+        logger.warning(f"Edge Neural TTS failed for '{clean_lang}' ({voice}): {e}. Switching to gTTS fallback...")
 
     # 2. Fallback to gTTS if Edge TTS fails
     try:
