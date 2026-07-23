@@ -383,39 +383,31 @@ export class TranslationRoomPage {
       }
     }
 
-    // 1. Play Server Neural TTS (Microsoft Edge Neural Voices with SSML Pitch & Formant EQ)
+    // 1. Play Server Neural TTS (Microsoft Edge Neural Voices with SSML Pitch & Acoustic Echo Suppression)
     const playServerNeuralTTS = () => {
       try {
         const gender = store.get("voice_gender") || "female";
         const encodedText = encodeURIComponent(text);
         const ttsUrl = `/api/tts?text=${encodedText}&lang=${cleanLang}&gender=${gender}&pitch=${encodeURIComponent(pitchStr)}&rate=+0%`;
         const audio = new Audio(ttsUrl);
-        audio.crossOrigin = "anonymous";
 
-        // Apply Web Audio BiquadFilter Formant EQ Polish on playback
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) {
-          audio.addEventListener("canplaythrough", () => {
-            try {
-              const ctx = new AudioCtx();
-              const source = ctx.createMediaElementSource(audio);
-              const filter = ctx.createBiquadFilter();
-              
-              // Vocal warmth low-shelf filter
-              filter.type = "lowshelf";
-              filter.frequency.value = 250;
-              filter.gain.value = gender === "male" ? 3.0 : 1.5; // Extra warmth for male voices
-              
-              source.connect(filter);
-              filter.connect(ctx.destination);
-            } catch (e) {
-              // Fallback to direct HTML5 audio output if CORS or Web Audio context fails
-            }
-          }, { once: true });
+        // Acoustic Echo Suppression: Pause mic during TTS playback to prevent audio loop on mobile
+        if (this.speechClient) {
+          try { this.speechClient.stop(); } catch(e) {}
         }
+
+        const resumeMic = () => {
+          if (this.speechClient && !this.isMuted) {
+            try { this.speechClient.start(); } catch(e) {}
+          }
+        };
+
+        audio.onended = resumeMic;
+        audio.onerror = resumeMic;
 
         audio.play().catch(err => {
           console.warn("Server Neural TTS playback notice:", err.message || err);
+          resumeMic();
           playNativeBrowserTTS();
         });
       } catch (e) {

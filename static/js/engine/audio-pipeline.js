@@ -13,7 +13,14 @@ export class AudioPipeline {
     if (this.isRecording) return;
     
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: { ideal: true },
+          noiseSuppression: { ideal: true },
+          autoGainControl: { ideal: true }
+        },
+        video: false
+      });
       
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.audioContext = new AudioCtx();
