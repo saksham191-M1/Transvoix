@@ -5,6 +5,9 @@ export class SpeechClient {
     this.onResultCallback = null;
     this.lang = "en-US";
     this._restartTimer = null;
+    this._isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    this._micStream = null; // Pre-claimed mic stream to avoid repeated permission prompts
+    this._hardwareError = false; // Stop restart loop on permission/hardware errors
   }
 
   _getLocale(lang) {
@@ -33,6 +36,27 @@ export class SpeechClient {
     return localeMap[lang] || lang;
   }
 
+  /**
+   * Pre-claim the microphone once on mobile to prevent Android OS from 
+   * showing permission prompts on every SpeechRecognition.start() call.
+   */
+  async _preclaimMic() {
+    if (this._micStream) return; // Already claimed
+    try {
+      this._micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      console.log("Mic stream pre-claimed for speech recognition");
+    } catch (e) {
+      console.warn("Could not pre-claim mic stream:", e.message);
+      // Not fatal — SpeechRecognition may still work on some browsers
+    }
+  }
+
   initialize(lang, onResultCallback) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -42,11 +66,15 @@ export class SpeechClient {
 
     this.lang = lang;
     this.onResultCallback = onResultCallback;
+    this._hardwareError = false;
 
     try {
       this.recognition = new SpeechRecognition();
-      // Mobile Safari / Chrome Android optimization: continuous works best on desktop, set to true with fallback handling
-      this.recognition.continuous = true;
+      
+      // Mobile: continuous=false prevents Android from keeping mic hardware 
+      // locked open, which causes the OS to play repeated activation chimes.
+      // Desktop: continuous=true for seamless dictation.
+      this.recognition.continuous = !this._isMobile;
       this.recognition.interimResults = true;
       this.recognition.lang = this._getLocale(this.lang);
 
@@ -72,11 +100,15 @@ export class SpeechClient {
 
       this.recognition.onerror = (event) => {
         if (event.error === "no-speech") {
-          // Normal idle cycle on mobile
+          // Normal idle cycle — not an error, will restart via onend
+        } else if (event.error === "aborted") {
+          // User or system aborted — normal during navigation or mute
         } else if (event.error === "network") {
-          console.warn("Speech recognition network notice. Retrying...");
+          console.warn("Speech recognition network notice. Will retry...");
         } else if (event.error === "audio-capture" || event.error === "not-allowed") {
-          console.error("Microphone hardware access notice:", event.error);
+          // CRITICAL: Hardware or permission error — STOP the restart loop entirely
+          console.error("Microphone access denied or unavailable:", event.error);
+          this._hardwareError = true;
           this.isListening = false;
         } else {
           console.warn("Speech recognition notice:", event.error);
@@ -84,19 +116,26 @@ export class SpeechClient {
       };
 
       this.recognition.onend = () => {
-        // Mobile clean restart with 300ms buffer to prevent hardware lock
-        if (this.isListening) {
-          clearTimeout(this._restartTimer);
-          this._restartTimer = setTimeout(() => {
-            if (this.isListening && this.recognition) {
-              try {
-                this.recognition.start();
-              } catch (e) {
-                // Ignore if already active
-              }
+        // Do NOT restart if:
+        // 1. User explicitly stopped (isListening = false)
+        // 2. Hardware/permission error occurred (would just loop chimes)
+        if (!this.isListening || this._hardwareError) return;
+
+        clearTimeout(this._restartTimer);
+
+        // Mobile: 1500ms delay to let Android OS fully release mic hardware
+        // and prevent rapid chime loop. Desktop: 300ms for responsiveness.
+        const restartDelay = this._isMobile ? 1500 : 300;
+
+        this._restartTimer = setTimeout(() => {
+          if (this.isListening && this.recognition && !this._hardwareError) {
+            try {
+              this.recognition.start();
+            } catch (e) {
+              // Ignore InvalidStateError if already active
             }
-          }, 300);
-        }
+          }
+        }, restartDelay);
       };
 
       return true;
@@ -106,9 +145,16 @@ export class SpeechClient {
     }
   }
 
-  start() {
+  async start() {
     if (!this.recognition || this.isListening) return;
+    
+    // On mobile, pre-claim mic once to prevent repeated OS permission prompts
+    if (this._isMobile && !this._micStream) {
+      await this._preclaimMic();
+    }
+
     this.isListening = true;
+    this._hardwareError = false;
     try {
       this.recognition.start();
     } catch (e) {
@@ -128,6 +174,17 @@ export class SpeechClient {
     }
   }
 
+  /**
+   * Release the pre-claimed mic stream (call on page leave / cleanup)
+   */
+  destroy() {
+    this.stop();
+    if (this._micStream) {
+      this._micStream.getTracks().forEach(t => t.stop());
+      this._micStream = null;
+    }
+  }
+
   updateLanguage(lang) {
     this.lang = lang;
     if (this.recognition) {
@@ -135,7 +192,7 @@ export class SpeechClient {
       this.stop();
       this.recognition.lang = this._getLocale(lang);
       if (wasListening) {
-        setTimeout(() => this.start(), 200);
+        setTimeout(() => this.start(), 500);
       }
     }
   }

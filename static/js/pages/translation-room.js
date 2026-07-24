@@ -130,7 +130,7 @@ export class TranslationRoomPage {
     const isMobileDevice = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     // Event handlers
-    this.wsClient.on("open", () => {
+    this.wsClient.on("open", async () => {
       // 1. Initialize Speech Recognition FIRST (Primary engine for text input)
       const initialized = this.speechClient.initialize(this.spokenLang, (transcript) => {
         if (!this.isMuted && !this.isTTSPlaying) {
@@ -144,7 +144,8 @@ export class TranslationRoomPage {
       });
 
       if (initialized) {
-        this.speechClient.start();
+        // Async: on mobile, pre-claims mic once to prevent repeated Android permission chimes
+        await this.speechClient.start();
       }
 
       // 2. Start Audio Pipeline Visualizer on desktop only to avoid dual-stream mic lock & beep chimes on mobile
@@ -273,7 +274,7 @@ export class TranslationRoomPage {
     if (leaveBtn) {
       leaveBtn.addEventListener("click", async () => {
         this.audioPipeline.stop();
-        this.speechClient.stop();
+        this.speechClient.destroy(); // Release mic hardware stream fully
         
         // Save transcript before leaving if there are entries
         if (this.transcriptEntries.length > 0 && !user.id.startsWith("guest_")) {
