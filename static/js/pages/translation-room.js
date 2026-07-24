@@ -126,11 +126,14 @@ export class TranslationRoomPage {
       this.listeningLang
     );
 
+    this.isTTSPlaying = false;
+    const isMobileDevice = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     // Event handlers
     this.wsClient.on("open", () => {
-      // 1. Initialize & start Speech Recognition FIRST (Primary engine for mobile mic text input)
+      // 1. Initialize Speech Recognition FIRST (Primary engine for text input)
       const initialized = this.speechClient.initialize(this.spokenLang, (transcript) => {
-        if (!this.isMuted) {
+        if (!this.isMuted && !this.isTTSPlaying) {
           if (transcript.interim) {
             this.wsClient.sendSpeech(transcript.interim, false);
           }
@@ -144,15 +147,17 @@ export class TranslationRoomPage {
         this.speechClient.start();
       }
 
-      // 2. Start Audio Pipeline Visualizer second with silent fallback for mobile devices
-      try {
-        this.audioPipeline.start((level) => {
-          if (!this.isMuted && this.visualizer) {
-            this.visualizer.draw(level);
-          }
-        });
-      } catch (e) {
-        console.warn("AudioPipeline visualizer notice:", e);
+      // 2. Start Audio Pipeline Visualizer on desktop only to avoid dual-stream mic lock & beep chimes on mobile
+      if (!isMobileDevice) {
+        try {
+          this.audioPipeline.start((level) => {
+            if (!this.isMuted && this.visualizer) {
+              this.visualizer.draw(level);
+            }
+          });
+        } catch (e) {
+          console.warn("AudioPipeline visualizer notice:", e);
+        }
       }
     });
 
@@ -398,19 +403,16 @@ export class TranslationRoomPage {
         const ttsUrl = `/api/tts?text=${encodedText}&lang=${cleanLang}&gender=${gender}&pitch=${encodeURIComponent(pitchStr)}&rate=+0%`;
         const audio = new Audio(ttsUrl);
 
-        // Acoustic Echo Suppression: Pause mic during TTS playback to prevent audio loop on mobile
-        if (this.speechClient) {
-          try { this.speechClient.stop(); } catch(e) {}
-        }
+        // Acoustic Echo Suppression: Ignore mic input during TTS playback without triggering mobile mic chimes
+        this.isTTSPlaying = true;
 
         const resumeMic = () => {
-          if (this.speechClient && !this.isMuted) {
-            try { this.speechClient.start(); } catch(e) {}
-          }
+          this.isTTSPlaying = false;
         };
 
         audio.onended = resumeMic;
         audio.onerror = resumeMic;
+        audio.onpause = resumeMic;
 
         audio.play().catch(err => {
           console.warn("Server Neural TTS playback notice:", err.message || err);
