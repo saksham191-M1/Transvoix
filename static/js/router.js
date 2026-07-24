@@ -2,6 +2,7 @@ export class Router {
   constructor(routes, containerId) {
     this.routes = routes;
     this.container = document.getElementById(containerId);
+    this.currentPage = null; // Track active page for lifecycle cleanup
     window.addEventListener("hashchange", () => this.route());
   }
 
@@ -30,7 +31,13 @@ export class Router {
     
     if (pageHandler) {
       try {
+        // Unmount previous page (release mic, WS, timers, etc.)
+        if (this.currentPage && typeof this.currentPage.unmount === "function") {
+          try { this.currentPage.unmount(); } catch (e) { console.warn("Page unmount:", e); }
+        }
+
         const pageInstance = await pageHandler();
+        this.currentPage = pageInstance;
         this.container.innerHTML = "";
         
         // Render page template

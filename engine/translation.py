@@ -12,6 +12,36 @@ class TranslationEngine:
         # Local cache for custom dictionary overrides per user/dictionary
         # Structure: {dictionary_id: {source_term: target_term}}
         self.dictionaries: Dict[str, Dict[str, str]] = {}
+        
+        self.openai_client = None
+        if getattr(settings, "GROK_API_KEY", ""):
+            from openai import OpenAI
+            self.openai_client = OpenAI(
+                api_key=settings.GROK_API_KEY,
+                base_url="https://api.x.ai/v1",
+                timeout=settings.TRANSLATION_TIMEOUT
+            )
+            
+        self.deepl_translator = None
+        if getattr(settings, "DEEPL_API_KEY", ""):
+            import deepl
+            self.deepl_translator = deepl.Translator(settings.DEEPL_API_KEY)
+            
+        self.google_translators = {}
+        self.mymemory_translators = {}
+
+    def get_google_translator(self, src, tgt):
+        key = (src, tgt)
+        if key not in self.google_translators:
+            self.google_translators[key] = GoogleTranslator(source=src, target=tgt)
+        return self.google_translators[key]
+
+    def get_mymemory_translator(self, src, tgt):
+        key = (src, tgt)
+        if key not in self.mymemory_translators:
+            from deep_translator import MyMemoryTranslator
+            self.mymemory_translators[key] = MyMemoryTranslator(source=src, target=tgt)
+        return self.mymemory_translators[key]
 
     def load_dictionary(self, dictionary_id: str, entries: List[Dict[str, str]]):
         """Load or update custom dictionary cache."""
@@ -27,7 +57,7 @@ class TranslationEngine:
 
     def _apply_dictionary(self, text: str, dictionary_id: Optional[str]) -> str:
         """Apply exact dictionary term replacements."""
-        if not dictionary_id or dictionary_id not in self.dictionaries:
+        if dictionary_id is None or dictionary_id not in self.dictionaries:
             return text
         
         words = text.split()
@@ -43,89 +73,6 @@ class TranslationEngine:
                 words[i] = replaced
                 
         return " ".join(words)
-
-    @lru_cache(maxsize=2048)
-    def _translate_cached(self, text: str, source: str, target: str) -> str:
-        """
-        Translate with priority chain:
-        1. Grok AI (xAI) — best for slang, context, casual speech
-        2. DeepL API     — excellent accuracy for formal language
-        3. Google Translate — broad language support
-        4. MyMemory      — final fallback
-        """
-        src_mapped = "zh-CN" if source == "zh" else source
-        tgt_mapped = "zh-CN" if target == "zh" else target
-
-        if src_mapped == tgt_mapped:
-            return text
-
-        src_clean = src_mapped.split("-")[0].lower()
-        tgt_clean = tgt_mapped.split("-")[0].lower()
-
-        # 1. Grok AI (xAI) — context-aware, slang-friendly translation
-        if getattr(settings, "GROK_API_KEY", ""):
-            try:
-                from openai import OpenAI
-                client = OpenAI(
-                    api_key=settings.GROK_API_KEY,
-                    base_url="https://api.x.ai/v1"
-                )
-                prompt = (
-                    f"Translate the following text from {src_clean} to {tgt_clean}. "
-                    f"Preserve tone, slang, and casual language naturally. "
-                    f"Return ONLY the translated text, no explanations or quotes.\n\n"
-                    f"{text}"
-                )
-                response = client.chat.completions.create(
-                    model=settings.GROK_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=500,
-                    temperature=0.3
-                )
-                result = response.choices[0].message.content.strip()
-                logger.info(f"Grok translated ({src_clean} -> {tgt_clean}): '{text}' -> '{result}'")
-                return result
-            except Exception as grok_err:
-                logger.warning(f"Grok translation failed ({src_clean} -> {tgt_clean}): {grok_err}. Trying DeepL...")
-
-        # 2. DeepL API
-        if getattr(settings, "DEEPL_API_KEY", ""):
-            try:
-                import deepl
-                translator = deepl.Translator(settings.DEEPL_API_KEY)
-                src_code = src_clean.upper()
-                tgt_code = tgt_clean.upper()
-                if tgt_code == "EN":
-                    tgt_code = "EN-US"
-                result = translator.translate_text(text, source_lang=src_code, target_lang=tgt_code)
-                return result.text
-            except Exception as deepl_err:
-                logger.warning(f"DeepL failed ({src_clean} -> {tgt_clean}): {deepl_err}. Trying Google...")
-
-        # 3. Google Translate
-        try:
-            translator = GoogleTranslator(source=src_mapped, target=tgt_mapped)
-            return translator.translate(text)
-        except Exception as google_err:
-            logger.warning(f"Google failed ({src_mapped} -> {tgt_mapped}): {google_err}. Trying MyMemory...")
-
-        # 4. MyMemory fallback
-        try:
-            from deep_translator import MyMemoryTranslator
-            mymemory_map = {
-                "en": "en-US", "es": "es-ES", "fr": "fr-FR", "de": "de-DE",
-                "it": "it-IT", "pt": "pt-PT", "ja": "ja-JP", "ko": "ko-KR",
-                "zh": "zh-CN", "hi": "hi-IN", "ar": "ar-SA", "ru": "ru-RU",
-                "tr": "tr-TR", "vi": "vi-VN", "nl": "nl-NL", "pl": "pl-PL",
-                "sv": "sv-SE", "no": "nb-NO", "da": "da-DK", "fi": "fi-FI"
-            }
-            src_mymemory = mymemory_map.get(src_clean, "en-US")
-            tgt_mymemory = mymemory_map.get(tgt_clean, "en-US")
-            translator = MyMemoryTranslator(source=src_mymemory, target=tgt_mymemory)
-            return translator.translate(text)
-        except Exception as mymemory_err:
-            logger.error(f"All translation backends failed ({src_mapped} -> {tgt_mapped}): {mymemory_err}")
-            return text
 
     def translate(self, text: str, source_lang: str, target_lang: str, dictionary_id: Optional[str] = None) -> str:
         """Translate text with custom dictionary override."""
@@ -154,7 +101,7 @@ class TranslationEngine:
         processed_text = self._apply_dictionary(text, dictionary_id)
         
         # 4. Perform translation
-        translated = self._translate_cached(processed_text, src, tgt)
+        translated = _translate_cached(processed_text, src, tgt)
         
         # Apply dictionary again after translation to ensure terms are correctly mapped in output
         final_text = self._apply_dictionary(translated, dictionary_id)
@@ -173,3 +120,79 @@ class TranslationEngine:
 
 # Global Translation Engine instance
 translation_engine = TranslationEngine()
+
+@lru_cache(maxsize=2048)
+def _translate_cached(text: str, source: str, target: str) -> str:
+    """
+    Translate with priority chain:
+    1. Grok AI (xAI) — best for slang, context, casual speech
+    2. DeepL API     — excellent accuracy for formal language
+    3. Google Translate — broad language support
+    4. MyMemory      — final fallback
+    """
+    src_mapped = "zh-CN" if source == "zh" else source
+    tgt_mapped = "zh-CN" if target == "zh" else target
+
+    if src_mapped == tgt_mapped:
+        return text
+
+    src_clean = src_mapped.split("-")[0].lower()
+    tgt_clean = tgt_mapped.split("-")[0].lower()
+
+    # 1. Grok AI (xAI) — context-aware, slang-friendly translation
+    if translation_engine.openai_client:
+        try:
+            prompt = (
+                f"Translate the following text from {src_clean} to {tgt_clean}. "
+                f"Preserve tone, slang, and casual language naturally. "
+                f"Return ONLY the translated text, no explanations or quotes.\n\n"
+                f"{text}"
+            )
+            response = translation_engine.openai_client.chat.completions.create(
+                model=settings.GROK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,
+                temperature=0.3,
+                timeout=settings.TRANSLATION_TIMEOUT
+            )
+            result = response.choices[0].message.content.strip()
+            logger.info(f"Grok translated ({src_clean} -> {tgt_clean}): '{text}' -> '{result}'")
+            return result
+        except Exception as grok_err:
+            logger.warning(f"Grok translation failed ({src_clean} -> {tgt_clean}): {grok_err}. Trying DeepL...")
+
+    # 2. DeepL API
+    if translation_engine.deepl_translator:
+        try:
+            src_code = src_clean.upper()
+            tgt_code = tgt_clean.upper()
+            if tgt_code == "EN":
+                tgt_code = "EN-US"
+            result = translation_engine.deepl_translator.translate_text(text, source_lang=src_code, target_lang=tgt_code)
+            return result.text
+        except Exception as deepl_err:
+            logger.warning(f"DeepL failed ({src_clean} -> {tgt_clean}): {deepl_err}. Trying Google...")
+
+    # 3. Google Translate
+    try:
+        translator = translation_engine.get_google_translator(src_mapped, tgt_mapped)
+        return translator.translate(text)
+    except Exception as google_err:
+        logger.warning(f"Google failed ({src_mapped} -> {tgt_mapped}): {google_err}. Trying MyMemory...")
+
+    # 4. MyMemory fallback
+    try:
+        mymemory_map = {
+            "en": "en-US", "es": "es-ES", "fr": "fr-FR", "de": "de-DE",
+            "it": "it-IT", "pt": "pt-PT", "ja": "ja-JP", "ko": "ko-KR",
+            "zh": "zh-CN", "hi": "hi-IN", "ar": "ar-SA", "ru": "ru-RU",
+            "tr": "tr-TR", "vi": "vi-VN", "nl": "nl-NL", "pl": "pl-PL",
+            "sv": "sv-SE", "no": "nb-NO", "da": "da-DK", "fi": "fi-FI"
+        }
+        src_mymemory = mymemory_map.get(src_clean, "en-US")
+        tgt_mymemory = mymemory_map.get(tgt_clean, "en-US")
+        translator = translation_engine.get_mymemory_translator(src_mymemory, tgt_mymemory)
+        return translator.translate(text)
+    except Exception as mymemory_err:
+        logger.error(f"All translation backends failed ({src_mapped} -> {tgt_mapped}): {mymemory_err}")
+        return text

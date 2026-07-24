@@ -5,12 +5,9 @@ from config import settings
 DB_FILE = settings.DB_PATH
 
 async def get_db():
-    db = await aiosqlite.connect(DB_FILE)
-    db.row_factory = aiosqlite.Row
-    try:
+    async with aiosqlite.connect(DB_FILE) as db:
+        db.row_factory = aiosqlite.Row
         yield db
-    finally:
-        pass # Handle closing externally or context-managed
 
 async def init_db():
     os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)

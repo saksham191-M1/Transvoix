@@ -2,6 +2,7 @@ import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from engine.session_manager import session_manager
+from engine.language_negotiator import language_negotiator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websockets"])
@@ -47,7 +48,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, participant_
                 new_spoken = payload.get("spoken_lang")
                 new_listen = payload.get("listening_lang")
                 
-                from engine.language_negotiator import language_negotiator
                 if new_spoken:
                     language_negotiator.update_spoken_language(session_id, participant_id, new_spoken)
                 if new_listen:

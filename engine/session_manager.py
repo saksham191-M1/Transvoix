@@ -1,9 +1,11 @@
 import json
 import logging
+import asyncio
 from typing import Dict, List, Set, Any
 from fastapi import WebSocket
 from engine.language_negotiator import language_negotiator, ParticipantLanguageProfile
 from engine.translation import translation_engine
+from engine.adaptive_learner import adaptive_learner
 
 logger = logging.getLogger(__name__)
 
@@ -144,14 +146,19 @@ class SessionManager:
         target_langs = language_negotiator.get_required_translations(session_id, sender_id)
         
         # 2. Perform translation for each required target language once
-        translations = {}
-        for lang in target_langs:
-            translations[lang] = translation_engine.translate(text, source_lang, lang, dictionary_id)
-            # Record translation usage for adaptive learner (async task)
+        async def _translate_lang(lang):
+            translated = await asyncio.to_thread(
+                translation_engine.translate, text, source_lang, lang, dictionary_id
+            )
             if not sender_id.startswith("guest_"):
-                import asyncio
-                from engine.adaptive_learner import adaptive_learner
                 asyncio.create_task(adaptive_learner.record_translation_use(sender_id, source_lang, lang))
+            return lang, translated
+
+        if target_langs:
+            results = await asyncio.gather(*[_translate_lang(lang) for lang in target_langs])
+            translations = dict(results)
+        else:
+            translations = {}
 
         # 3. Deliver customized messages to each participant
         for pid, websocket in self.active_connections[session_id].items():

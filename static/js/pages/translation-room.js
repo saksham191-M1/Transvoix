@@ -15,8 +15,14 @@ export class TranslationRoomPage {
     this.spokenLang = "en";
     this.listeningLang = "en";
     this.isMuted = false;
+    this.isTTSPlaying = false;
     this.startTime = Date.now();
     this.transcriptEntries = [];
+    
+    // TTS Audio Queue: prevents overlapping audio playback
+    this._ttsQueue = [];
+    this._ttsPlaying = false;
+    this._currentAudio = null;
   }
 
   render(sessionId) {
@@ -50,9 +56,10 @@ export class TranslationRoomPage {
             </div>
           </div>
           
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
             <button id="enable-audio-btn" class="btn btn-secondary" style="border-color: var(--accent-primary); color: var(--accent-secondary);">🔊 Enable Audio</button>
             <button id="mute-btn" class="btn btn-secondary">🎙️ Mute Mic</button>
+            <button id="voice-gender-toggle" class="btn btn-secondary" style="min-width: 90px; font-size: 0.85rem; border-color: var(--accent-tertiary, #a78bfa); color: var(--accent-tertiary, #a78bfa);" title="Toggle voice gender">${(store.get("voice_gender") || "female") === "female" ? "♀ Female" : "♂ Male"}</button>
             <button id="leave-btn" class="btn btn-secondary btn-danger">Leave Room</button>
           </div>
         </div>
@@ -130,22 +137,21 @@ export class TranslationRoomPage {
     const isMobileDevice = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     // Event handlers
-    this.wsClient.on("open", async () => {
-      // 1. Initialize Speech Recognition FIRST (Primary engine for text input)
+    this.wsClient.on("open", () => {
+      // 1. Initialize Speech Recognition (Primary engine for text input)
       const initialized = this.speechClient.initialize(this.spokenLang, (transcript) => {
         if (!this.isMuted && !this.isTTSPlaying) {
-          if (transcript.interim) {
-            this.wsClient.sendSpeech(transcript.interim, false);
-          }
+          // Only send final OR interim, not both in same tick
           if (transcript.final) {
             this.wsClient.sendSpeech(transcript.final, true);
+          } else if (transcript.interim) {
+            this.wsClient.sendSpeech(transcript.interim, false);
           }
         }
       });
 
       if (initialized) {
-        // Async: on mobile, pre-claims mic once to prevent repeated Android permission chimes
-        await this.speechClient.start();
+        this.speechClient.start();
       }
 
       // 2. Start Audio Pipeline Visualizer on desktop only to avoid dual-stream mic lock & beep chimes on mobile
@@ -164,10 +170,13 @@ export class TranslationRoomPage {
 
     const captionContainer = document.getElementById("caption-container");
 
+    // Track speakers who have pending captions (to deduplicate caption + translation events)
+    this._pendingCaptionSpeakers = new Set();
+
     this.wsClient.on("caption", (data) => {
       if (data.is_final) {
-        // Append our own final speech block to our chat feed
-        this._appendFinalCaption(data.speaker, data.text, data.text, this.spokenLang);
+        // Mark that this speaker has a pending caption — translation event will show the final version
+        this._pendingCaptionSpeakers.add(data.speaker);
         
         // Save our own entry to local transcript array for history
         this.transcriptEntries.push({
@@ -183,7 +192,10 @@ export class TranslationRoomPage {
     });
 
     this.wsClient.on("translation", (data) => {
-      // Render final translated speech block
+      // Clear the pending caption flag — translation event is the authoritative final rendering
+      this._pendingCaptionSpeakers.delete(data.speaker);
+
+      // Render final translated speech block (single bubble, not duplicate)
       this._appendFinalCaption(data.speaker, data.original, data.translated, data.target_lang);
       
       // Save entry to local transcript array for export history
@@ -194,9 +206,9 @@ export class TranslationRoomPage {
         language: data.target_lang
       });
       
-      // Trigger voice read-out if not our own speech
+      // Trigger queued voice read-out if not our own speech
       if (data.speaker !== user.display_name) {
-        this._speakText(data.translated, data.target_lang);
+        this._enqueueTTS(data.translated, data.target_lang);
       }
     });
 
@@ -268,6 +280,20 @@ export class TranslationRoomPage {
         this.isMuted = !this.isMuted;
         muteBtn.innerText = this.isMuted ? "🔇 Unmute" : "🎙️ Mute";
         muteBtn.classList.toggle("speaking-pulse", !this.isMuted);
+      });
+    }
+
+    // Voice Gender Toggle (Male ↔ Female)
+    const genderToggle = document.getElementById("voice-gender-toggle");
+    if (genderToggle) {
+      genderToggle.addEventListener("click", () => {
+        const current = store.get("voice_gender") || "female";
+        const next = current === "female" ? "male" : "female";
+        store.set("voice_gender", next);
+        genderToggle.innerText = next === "female" ? "♀ Female" : "♂ Male";
+        // Brief visual feedback
+        genderToggle.style.transform = "scale(0.92)";
+        setTimeout(() => { genderToggle.style.transform = "scale(1)"; }, 150);
       });
     }
 
@@ -380,8 +406,32 @@ export class TranslationRoomPage {
     container.scrollTop = container.scrollHeight;
   }
 
-  _speakText(text, langCode) {
+  /**
+   * Enqueue a TTS item. Plays sequentially to prevent overlapping audio.
+   */
+  _enqueueTTS(text, langCode) {
     if (!text) return;
+    this._ttsQueue.push({ text, langCode });
+    if (!this._ttsPlaying) {
+      this._playNextTTS();
+    }
+  }
+
+  _playNextTTS() {
+    if (this._ttsQueue.length === 0) {
+      this._ttsPlaying = false;
+      this.isTTSPlaying = false;
+      return;
+    }
+
+    this._ttsPlaying = true;
+    this.isTTSPlaying = true;
+    const { text, langCode } = this._ttsQueue.shift();
+    this._speakText(text, langCode);
+  }
+
+  _speakText(text, langCode) {
+    if (!text) { this._playNextTTS(); return; }
     const cleanLang = langCode.split("-")[0].toLowerCase();
     
     // Calculate dynamic pitch offset from microphone audio pipeline
@@ -396,6 +446,11 @@ export class TranslationRoomPage {
       }
     }
 
+    const onFinished = () => {
+      this._currentAudio = null;
+      this._playNextTTS();
+    };
+
     // 1. Play Server Neural TTS (Microsoft Edge Neural Voices with SSML Pitch & Acoustic Echo Suppression)
     const playServerNeuralTTS = () => {
       try {
@@ -403,21 +458,15 @@ export class TranslationRoomPage {
         const encodedText = encodeURIComponent(text);
         const ttsUrl = `/api/tts?text=${encodedText}&lang=${cleanLang}&gender=${gender}&pitch=${encodeURIComponent(pitchStr)}&rate=+0%`;
         const audio = new Audio(ttsUrl);
+        this._currentAudio = audio;
 
-        // Acoustic Echo Suppression: Ignore mic input during TTS playback without triggering mobile mic chimes
-        this.isTTSPlaying = true;
-
-        const resumeMic = () => {
-          this.isTTSPlaying = false;
+        audio.onended = onFinished;
+        audio.onerror = () => {
+          playNativeBrowserTTS();
         };
-
-        audio.onended = resumeMic;
-        audio.onerror = resumeMic;
-        audio.onpause = resumeMic;
 
         audio.play().catch(err => {
           console.warn("Server Neural TTS playback notice:", err.message || err);
-          resumeMic();
           playNativeBrowserTTS();
         });
       } catch (e) {
@@ -428,7 +477,7 @@ export class TranslationRoomPage {
 
     // 2. Browser Native TTS Fallback
     const playNativeBrowserTTS = () => {
-      if (!window.speechSynthesis) return;
+      if (!window.speechSynthesis) { onFinished(); return; }
       window.speechSynthesis.cancel();
       const localeMap = {
         ru: "ru-RU", en: "en-US", es: "es-ES", zh: "zh-CN",
@@ -443,6 +492,8 @@ export class TranslationRoomPage {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = locale;
       if (matchingVoice) utterance.voice = matchingVoice;
+      utterance.onend = onFinished;
+      utterance.onerror = onFinished;
       window.speechSynthesis.speak(utterance);
     };
 
@@ -479,5 +530,32 @@ export class TranslationRoomPage {
   _removeParticipantUI(id) {
     const pDiv = document.getElementById(`part-${id}`);
     if (pDiv) pDiv.remove();
+  }
+
+  /**
+   * Lifecycle: called by Router when navigating away from this page.
+   * Releases microphone, WebSocket, audio pipeline, and TTS resources.
+   */
+  unmount() {
+    // Stop TTS queue
+    this._ttsQueue = [];
+    this._ttsPlaying = false;
+    this.isTTSPlaying = false;
+    if (this._currentAudio) {
+      try { this._currentAudio.pause(); this._currentAudio = null; } catch(e) {}
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    // Release mic and speech recognition
+    this.speechClient.destroy();
+    this.audioPipeline.stop();
+
+    // Disconnect WebSocket
+    if (this.wsClient) {
+      this.wsClient.disconnect();
+      this.wsClient = null;
+    }
   }
 }

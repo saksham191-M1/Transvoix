@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     GROK_API_KEY: str = os.getenv("GROK_API_KEY", "")
     GROK_MODEL: str = os.getenv("GROK_MODEL", "grok-3-mini")
     CONFIDENCE_THRESHOLD: float = 0.5
+    TRANSLATION_TIMEOUT: float = 5.0
     
     model_config = SettingsConfigDict(env_file=".env")
 

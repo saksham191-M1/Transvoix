@@ -2,6 +2,7 @@ import io
 import logging
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
+import asyncio
 import edge_tts
 from gtts import gTTS
 
@@ -55,9 +56,15 @@ async def generate_tts(
         communicate = edge_tts.Communicate(text, voice, pitch=pitch, rate=rate)
         
         async def audio_chunk_generator():
+            buffer = bytearray()
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
-                    yield chunk["data"]
+                    buffer.extend(chunk["data"])
+                    while len(buffer) >= 4096:
+                        yield bytes(buffer[:4096])
+                        buffer = buffer[4096:]
+            if buffer:
+                yield bytes(buffer)
 
         return StreamingResponse(audio_chunk_generator(), media_type="audio/mpeg")
     except Exception as e:
@@ -67,7 +74,7 @@ async def generate_tts(
     try:
         mp3_fp = io.BytesIO()
         tts = gTTS(text=text, lang=clean_lang, slow=False)
-        tts.write_to_fp(mp3_fp)
+        await asyncio.to_thread(tts.write_to_fp, mp3_fp)
         mp3_fp.seek(0)
         return StreamingResponse(mp3_fp, media_type="audio/mpeg")
     except Exception as e:
