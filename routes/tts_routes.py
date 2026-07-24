@@ -50,16 +50,16 @@ async def generate_tts(
     lang_voices = EDGE_VOICE_MAP.get(clean_lang, EDGE_VOICE_MAP["en"])
     voice = lang_voices.get(clean_gender, lang_voices.get("female"))
     
-    # 1. Try Microsoft Edge Neural Voice with dynamic SSML pitch & rate modulation
+    # 1. Try Microsoft Edge Neural Voice with instant chunked audio streaming
     try:
         communicate = edge_tts.Communicate(text, voice, pitch=pitch, rate=rate)
-        audio_data = bytearray()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_data.extend(chunk["data"])
-                
-        if len(audio_data) > 0:
-            return Response(content=bytes(audio_data), media_type="audio/mpeg")
+        
+        async def audio_chunk_generator():
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    yield chunk["data"]
+
+        return StreamingResponse(audio_chunk_generator(), media_type="audio/mpeg")
     except Exception as e:
         logger.warning(f"Edge Neural TTS failed for '{clean_lang}' ({voice}): {e}. Switching to gTTS fallback...")
 
