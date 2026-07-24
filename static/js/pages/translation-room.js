@@ -128,15 +128,8 @@ export class TranslationRoomPage {
 
     // Event handlers
     this.wsClient.on("open", () => {
-      // Start microphone stream
-      this.audioPipeline.start((level) => {
-        if (!this.isMuted) {
-          this.visualizer.draw(level);
-        }
-      });
-      
-      // Start speech recognition
-      this.speechClient.initialize(this.spokenLang, (transcript) => {
+      // 1. Initialize & start Speech Recognition FIRST (Primary engine for mobile mic text input)
+      const initialized = this.speechClient.initialize(this.spokenLang, (transcript) => {
         if (!this.isMuted) {
           if (transcript.interim) {
             this.wsClient.sendSpeech(transcript.interim, false);
@@ -146,7 +139,21 @@ export class TranslationRoomPage {
           }
         }
       });
-      this.speechClient.start();
+
+      if (initialized) {
+        this.speechClient.start();
+      }
+
+      // 2. Start Audio Pipeline Visualizer second with silent fallback for mobile devices
+      try {
+        this.audioPipeline.start((level) => {
+          if (!this.isMuted && this.visualizer) {
+            this.visualizer.draw(level);
+          }
+        });
+      } catch (e) {
+        console.warn("AudioPipeline visualizer notice:", e);
+      }
     });
 
     const captionContainer = document.getElementById("caption-container");
