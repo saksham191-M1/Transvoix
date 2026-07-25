@@ -1,5 +1,6 @@
 import { Router } from "./router.js";
 import { store } from "./store.js";
+import { LenisEngine } from "./engine/lenis-smooth-scroll.js";
 
 // Lazy loading views
 const routes = {
@@ -33,30 +34,45 @@ const routes = {
   }
 };
 
-// Global Auto-Hiding Navbar Scroll Controller (YouTube style)
+// Global Auto-Hiding Navbar Scroll Controller (YouTube style with Lenis support)
 function initNavbarScrollController() {
-  let lastScrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+  let lastScrollY = 0;
 
-  window.addEventListener("scroll", () => {
+  const handleScroll = (currentScrollY, velocity = 0, direction = 0) => {
     const navbarEl = document.querySelector(".site-navbar");
     if (!navbarEl) return;
 
-    const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-    const diff = currentScrollY - lastScrollY;
-
-    if (currentScrollY > 40 && diff > 2) {
-      // Scrolling down past 40px -> hide navbar
+    if (direction === 1 && currentScrollY > 50 && (velocity > 0.5 || currentScrollY - lastScrollY > 5)) {
+      // Scrolling down past 50px -> hide navbar
       navbarEl.classList.add("nav-hidden");
-    } else if (diff < -2 || currentScrollY <= 20) {
+    } else if (direction === -1 || currentScrollY <= 20) {
       // Scrolling up or near top -> show navbar
       navbarEl.classList.remove("nav-hidden");
     }
 
     lastScrollY = currentScrollY;
+  };
+
+  // Subscribe to Lenis smooth scroll events
+  LenisEngine.onScroll(({ scroll, velocity, direction }) => {
+    handleScroll(scroll, Math.abs(velocity), direction);
+  });
+
+  // Native fallback listener
+  window.addEventListener("scroll", () => {
+    if (!LenisEngine.isInitialized) {
+      const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+      const diff = currentScrollY - lastScrollY;
+      const dir = diff > 0 ? 1 : (diff < 0 ? -1 : 0);
+      handleScroll(currentScrollY, Math.abs(diff), dir);
+    }
   }, { passive: true });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Initialize Lenis Smooth Scroll Engine
+  LenisEngine.init();
+
   // Initialize Router
   const router = new Router(routes, "app-viewport");
   router.init();
@@ -72,3 +88,4 @@ document.addEventListener("DOMContentLoaded", () => {
     })
     .catch(err => console.error("Failed to load languages:", err));
 });
+

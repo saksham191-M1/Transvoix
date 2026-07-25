@@ -27,7 +27,7 @@ export class RecordingsPage {
           <!-- Left: Call List -->
           <div class="glass-card" style="display: flex; flex-direction: column; gap: 16px; height: fit-content;">
             <h3 style="font-family: var(--font-family-heading); font-weight: 700;">Session History</h3>
-            <div id="recording-list" style="display: flex; flex-direction: column; gap: 10px;">
+            <div id="recording-list" data-lenis-prevent style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto;">
               <p style="color: var(--text-muted); font-size: 0.88rem;">Loading history...</p>
             </div>
           </div>

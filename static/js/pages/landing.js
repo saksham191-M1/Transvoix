@@ -1,5 +1,7 @@
 import { store } from "../store.js";
 import { navbar } from "../components/navbar.js";
+import { LenisEngine } from "../engine/lenis-smooth-scroll.js";
+import { Globe3DEngine } from "../engine/globe-3d.js";
 
 /* ============================================================
    TRANSVOIX LANDING PAGE — Ultra 3D Edition
@@ -174,6 +176,11 @@ export class LandingPage {
 
         <!-- ░░ HERO SECTION ░░ -->
         <section class="lv2-hero" aria-labelledby="hero-title">
+          <!-- 3D Real-World Globe Centered Background Stage -->
+          <div class="globe-3d-stage">
+            <div id="globe-3d-container" class="globe-3d-container"></div>
+          </div>
+
           <div class="lv2-hero__copy">
             <div class="hero-badge reveal-on-scroll">
               <span class="live-dot" aria-hidden="true"></span>
@@ -214,7 +221,7 @@ export class LandingPage {
           <!-- 3D Visual Card -->
           <div class="lv2-hero__visual reveal-scale" aria-label="Live translation preview" data-tilt>
 
-            <!-- Orbit language badges -->
+            <!-- Orbit language badges overlay -->
             <div class="orbit-system" aria-hidden="true">
               <span class="orbit-badge ob-1">🇮🇳 Hindi</span>
               <span class="orbit-badge ob-2">🇯🇵 Japanese</span>
@@ -597,12 +604,14 @@ export class LandingPage {
     const openModal = () => {
       if (!authModal) return;
       authModal.hidden = false;
+      LenisEngine.stop();
       requestAnimationFrame(() => authModal.classList.add("is-open"));
       document.getElementById("auth-email")?.focus();
     };
     const closeModal = () => {
       if (!authModal) return;
       authModal.classList.remove("is-open");
+      LenisEngine.start();
       setTimeout(() => { authModal.hidden = true; }, 300);
     };
 
@@ -689,10 +698,19 @@ export class LandingPage {
         window.location.hash = "#/app";
       });
     });
+
+    // ── 3D Interactive World Globe Initialization ───────────
+    setTimeout(() => {
+      const globeContainer = document.getElementById("globe-3d-container");
+      if (globeContainer) {
+        this._globeEngine = new Globe3DEngine(globeContainer);
+      }
+    }, 50);
   }
 
   unmounted() {
     this._starField?.destroy();
+    this._globeEngine?.destroy();
     if (typeof ScrollTrigger !== "undefined") ScrollTrigger.killAll();
   }
 }

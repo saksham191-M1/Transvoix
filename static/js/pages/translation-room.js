@@ -67,7 +67,7 @@ export class TranslationRoomPage {
         <div class="room-layout">
           <!-- Left: Captions, Speech Visualizer -->
           <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-            <div id="caption-container" class="caption-area" style="flex: 1; min-height: 280px; max-height: 480px;">
+            <div id="caption-container" class="caption-area" data-lenis-prevent style="flex: 1; min-height: 280px; max-height: 480px;">
               <div style="color: var(--text-muted); text-align: center; margin-top: 100px; font-size: 0.95rem;">
                 Waiting for participants to speak...
               </div>

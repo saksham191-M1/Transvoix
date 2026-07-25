@@ -51,7 +51,7 @@ export class DictionaryPage {
             </form>
 
             <h3 style="border-top: 1px solid var(--border-glass); padding-top: 16px; margin-top: 8px; font-family: var(--font-family-heading); font-weight: 700;">My Dictionaries</h3>
-            <div id="dict-list" style="display: flex; flex-direction: column; gap: 10px;">
+            <div id="dict-list" data-lenis-prevent style="display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto;">
               <p style="color: var(--text-muted); font-size: 0.88rem;">Loading dictionaries...</p>
             </div>
           </div>

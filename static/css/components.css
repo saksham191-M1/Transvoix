@@ -241,6 +241,7 @@
 /* --- Translation Console --------------------------------- */
 .translation-console {
   position: relative;
+  z-index: 2;
   background: var(--bg-glass-strong);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-xl);
