@@ -132,6 +132,105 @@
   background-clip: text;
 }
 
+/* ============================================================
+   PAGE TRANSITIONS — Framer-Motion-Style Enter/Exit System
+   ============================================================ */
+
+/* --- Exit keyframes --- */
+@keyframes page-exit-fade {
+  from { opacity: 1; filter: blur(0px); transform: scale(1) translateY(0); }
+  to   { opacity: 0; filter: blur(6px); transform: scale(0.97) translateY(-12px); }
+}
+
+@keyframes page-exit-slide-left {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-60px); }
+}
+
+/* --- Enter keyframes --- */
+@keyframes page-enter-fade {
+  from { opacity: 0; filter: blur(6px); transform: scale(0.97) translateY(18px); }
+  to   { opacity: 1; filter: blur(0px); transform: scale(1) translateY(0); }
+}
+
+@keyframes page-enter-slide-up {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes page-enter-scale {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* --- Staggered children entry (for cards, lists, etc.) --- */
+@keyframes stagger-fade-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Viewport container keeps overflow hidden during transitions --- */
+#app-viewport {
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Exit state --- */
+#app-viewport.page-exiting > * {
+  animation: page-exit-fade 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  pointer-events: none;
+}
+
+/* --- Enter state --- */
+#app-viewport.page-entering > * {
+  animation: page-enter-fade 0.4s cubic-bezier(0.0, 0, 0.2, 1) both;
+}
+
+/* Stagger direct children of main-content during page enter */
+#app-viewport.page-entering .main-content > *,
+#app-viewport.page-entering .landing-v2 > section {
+  opacity: 0;
+  animation: stagger-fade-in 0.5s cubic-bezier(0.0, 0, 0.2, 1) both;
+}
+
+/* Stagger delay per child */
+#app-viewport.page-entering .main-content > *:nth-child(1),
+#app-viewport.page-entering .landing-v2 > section:nth-child(1) { animation-delay: 0.05s; }
+#app-viewport.page-entering .main-content > *:nth-child(2),
+#app-viewport.page-entering .landing-v2 > section:nth-child(2) { animation-delay: 0.12s; }
+#app-viewport.page-entering .main-content > *:nth-child(3),
+#app-viewport.page-entering .landing-v2 > section:nth-child(3) { animation-delay: 0.19s; }
+#app-viewport.page-entering .main-content > *:nth-child(4),
+#app-viewport.page-entering .landing-v2 > section:nth-child(4) { animation-delay: 0.26s; }
+#app-viewport.page-entering .main-content > *:nth-child(5),
+#app-viewport.page-entering .landing-v2 > section:nth-child(5) { animation-delay: 0.33s; }
+#app-viewport.page-entering .main-content > *:nth-child(6),
+#app-viewport.page-entering .landing-v2 > section:nth-child(6) { animation-delay: 0.40s; }
+#app-viewport.page-entering .main-content > *:nth-child(n+7),
+#app-viewport.page-entering .landing-v2 > section:nth-child(n+7) { animation-delay: 0.45s; }
+
+/* Glass cards within grid get their own micro-stagger */
+#app-viewport.page-entering .dashboard-grid > .glass-card,
+#app-viewport.page-entering .feature-grid-3d > .feature-card-3d,
+#app-viewport.page-entering .testimonial-grid > .testimonial-card-3d {
+  opacity: 0;
+  animation: stagger-fade-in 0.45s cubic-bezier(0.0, 0, 0.2, 1) both;
+}
+#app-viewport.page-entering .dashboard-grid > *:nth-child(1) { animation-delay: 0.15s; }
+#app-viewport.page-entering .dashboard-grid > *:nth-child(2) { animation-delay: 0.22s; }
+#app-viewport.page-entering .dashboard-grid > *:nth-child(3) { animation-delay: 0.29s; }
+#app-viewport.page-entering .dashboard-grid > *:nth-child(4) { animation-delay: 0.36s; }
+#app-viewport.page-entering .dashboard-grid > *:nth-child(n+5) { animation-delay: 0.40s; }
+
+/* Navbar should not transition with page */
+#app-viewport.page-exiting .site-navbar,
+#app-viewport.page-entering .site-navbar {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
 /* Prefers-reduced-motion overrides */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -143,5 +242,14 @@
   .reveal-scale {
     opacity: 1;
     transform: none;
+  }
+  #app-viewport.page-exiting > *,
+  #app-viewport.page-entering > *,
+  #app-viewport.page-entering .main-content > *,
+  #app-viewport.page-entering .landing-v2 > section {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
   }
 }
