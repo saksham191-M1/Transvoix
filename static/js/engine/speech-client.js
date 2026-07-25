@@ -8,6 +8,8 @@ export class SpeechClient {
     this._isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     this._errorRetryCount = 0;
     this._maxErrorRetries = 3; // Auto-recover up to 3 times before giving up
+    this._micStream = null; // Pre-claimed mic stream: request permission once, reuse for session
+    this._hardwareError = false; // Stop restart loop on permission/hardware errors
   }
 
   _getLocale(lang) {
@@ -18,39 +20,63 @@ export class SpeechClient {
       de: "de-DE",
       it: "it-IT",
       pt: "pt-PT",
+      ru: "ru-RU",
       ja: "ja-JP",
       ko: "ko-KR",
       zh: "zh-CN",
       hi: "hi-IN",
       ar: "ar-SA",
-      ru: "ru-RU",
       tr: "tr-TR",
       vi: "vi-VN",
       nl: "nl-NL",
       pl: "pl-PL",
       sv: "sv-SE",
-      no: "no-NO",
+      no: "nb-NO",
       da: "da-DK",
       fi: "fi-FI"
     };
     return localeMap[lang] || lang;
   }
 
+  /**
+   * Pre-claim the microphone ONCE via getUserMedia. This makes the OS grant
+   * permission a single time and keeps one long-lived audio session open, so
+   * SpeechRecognition restarts do not re-prompt or replay the mobile
+   * activation chime. Safe to call repeatedly — guarded by _micStream.
+   */
+  async _preclaimMic() {
+    if (this._micStream) return; // Already claimed — request permission only once
+    try {
+      this._micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      console.log("Mic stream pre-claimed for speech recognition");
+    } catch (e) {
+      console.warn("Could not pre-claim mic stream:", e.message);
+      // Not fatal — SpeechRecognition may still work on some browsers
+    }
+  }
+
   initialize(lang, onResultCallback) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      console.warn("SpeechRecognition API not supported in this browser.");
+      console.error("SpeechRecognition API not supported in this browser.");
       return false;
     }
 
     this.lang = lang;
     this.onResultCallback = onResultCallback;
     this._errorRetryCount = 0;
+    this._hardwareError = false;
 
     try {
       this.recognition = new SpeechRecognition();
       // Use continuous=true everywhere — the key to avoiding Android chimes is
-      // NOT restarting recognition frequently. continuous=true keeps a single 
+      // NOT restarting recognition frequently. continuous=true keeps a single
       // long-lived mic session open, preventing repeated OS permission prompts.
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
@@ -60,11 +86,12 @@ export class SpeechClient {
         let interimTranscript = "";
         let finalTranscript = "";
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+            finalTranscript += transcript;
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            interimTranscript += transcript;
           }
         }
 
@@ -86,20 +113,20 @@ export class SpeechClient {
         } else if (event.error === "network") {
           console.warn("Speech recognition network notice. Will retry...");
         } else if (event.error === "audio-capture" || event.error === "not-allowed") {
-          // Hardware or permission error — increment retry counter
-          console.error("Microphone access issue:", event.error);
-          this._errorRetryCount++;
-          if (this._errorRetryCount >= this._maxErrorRetries) {
-            console.error("Max mic retries reached. Speech recognition stopped. Refresh page to retry.");
-            this.isListening = false;
-          }
+          // CRITICAL: Hardware or permission error — STOP the restart loop
+          // entirely, otherwise the OS keeps replaying the mic activation chime.
+          console.error("Microphone access denied or unavailable:", event.error);
+          this._hardwareError = true;
+          this.isListening = false;
         } else {
           console.warn("Speech recognition notice:", event.error);
         }
       };
 
       this.recognition.onend = () => {
-        if (!this.isListening) return;
+        // Do NOT restart if the user stopped, or a hardware/permission error
+        // occurred (restarting would just loop the OS chime).
+        if (!this.isListening || this._hardwareError) return;
 
         clearTimeout(this._restartTimer);
 
@@ -116,31 +143,39 @@ export class SpeechClient {
         }
 
         this._restartTimer = setTimeout(() => {
-          if (this.isListening && this.recognition) {
+          if (this.isListening && this.recognition && !this._hardwareError) {
             try {
               this.recognition.start();
             } catch (e) {
-              // Ignore InvalidStateError if already active
+              console.warn("Recognition restart notice:", e.message);
             }
           }
         }, restartDelay);
       };
 
       return true;
-    } catch (err) {
-      console.error("Failed to initialize SpeechRecognition:", err);
+    } catch (e) {
+      console.error("Failed to initialize SpeechRecognition:", e);
       return false;
     }
   }
 
-  start() {
+  async start() {
     if (!this.recognition || this.isListening) return;
+
+    // On mobile, pre-claim the mic once so the OS asks for permission a single
+    // time and keeps one long-lived audio session (no repeated chime).
+    if (this._isMobile && !this._micStream) {
+      await this._preclaimMic();
+    }
+
     this.isListening = true;
     this._errorRetryCount = 0;
+    this._hardwareError = false;
     try {
       this.recognition.start();
     } catch (e) {
-      // Catch InvalidStateError if browser recognition engine is still cycling
+      console.warn("Recognition start notice:", e.message);
     }
   }
 
@@ -151,7 +186,7 @@ export class SpeechClient {
       try {
         this.recognition.stop();
       } catch (e) {
-        // Stop failed (already stopped)
+        // Ignore stop errors
       }
     }
   }
@@ -161,6 +196,11 @@ export class SpeechClient {
    */
   destroy() {
     this.stop();
+    // Release the pre-claimed mic stream so the OS recording indicator clears.
+    if (this._micStream) {
+      this._micStream.getTracks().forEach(t => t.stop());
+      this._micStream = null;
+    }
     this.recognition = null;
   }
 
