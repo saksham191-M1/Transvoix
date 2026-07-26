@@ -61,10 +61,16 @@ export class SpeechClient {
     }
   }
 
-  initialize(lang, onResultCallback) {
+  initialize(lang, onResultCallback, onStatusCallback = null) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.onStatusCallback = onStatusCallback;
+    
     if (!SpeechRecognition) {
       console.error("SpeechRecognition API not supported in this browser.");
+      if (this.onStatusCallback) {
+        const isHttps = window.location.protocol === "https:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        this.onStatusCallback(isHttps ? "unsupported" : "insecure_context");
+      }
       return false;
     }
 
@@ -106,18 +112,24 @@ export class SpeechClient {
         }
       };
 
+      this.recognition.onstart = () => {
+        if (this.onStatusCallback) {
+          this.onStatusCallback("listening");
+        }
+      };
+
       this.recognition.onerror = (event) => {
         if (event.error === "no-speech" || event.error === "aborted") {
           // Normal idle cycles on mobile/desktop — not a real error
-          // Will restart via onend handler
         } else if (event.error === "network") {
           console.warn("Speech recognition network notice. Will retry...");
         } else if (event.error === "audio-capture" || event.error === "not-allowed") {
-          // CRITICAL: Hardware or permission error — STOP the restart loop
-          // entirely, otherwise the OS keeps replaying the mic activation chime.
           console.error("Microphone access denied or unavailable:", event.error);
           this._hardwareError = true;
           this.isListening = false;
+          if (this.onStatusCallback) {
+            this.onStatusCallback("permission_denied");
+          }
         } else {
           console.warn("Speech recognition notice:", event.error);
         }

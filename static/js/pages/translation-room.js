@@ -49,6 +49,9 @@ export class TranslationRoomPage {
               <span class="fc3d-tag fc3d-tag--cyan" style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em;">
                 Room Code: ${roomCode}
               </span>
+              <span id="mic-status-badge" class="fc3d-tag" style="font-size: 0.8rem; font-weight: 700; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);">
+                🎙️ Initializing Mic...
+              </span>
               <span class="live-badge-pill">
                 <span class="live-dot" aria-hidden="true"></span>
                 Live Audio & Translation
@@ -139,16 +142,40 @@ export class TranslationRoomPage {
     // Event handlers
     this.wsClient.on("open", () => {
       // 1. Initialize Speech Recognition (Primary engine for text input)
-      const initialized = this.speechClient.initialize(this.spokenLang, (transcript) => {
-        if (!this.isMuted && !this.isTTSPlaying) {
-          // Only send final OR interim, not both in same tick
-          if (transcript.final) {
-            this.wsClient.sendSpeech(transcript.final, true);
-          } else if (transcript.interim) {
-            this.wsClient.sendSpeech(transcript.interim, false);
+      const initialized = this.speechClient.initialize(
+        this.spokenLang,
+        (transcript) => {
+          if (!this.isMuted) {
+            // Only send final OR interim, not both in same tick
+            if (transcript.final) {
+              this.wsClient.sendSpeech(transcript.final, true);
+            } else if (transcript.interim) {
+              this.wsClient.sendSpeech(transcript.interim, false);
+            }
+          }
+        },
+        (status) => {
+          const badge = document.getElementById("mic-status-badge");
+          if (!badge) return;
+          if (status === "listening") {
+            badge.innerText = this.isMuted ? "🔇 Mic Muted" : "🎙️ Mic Active";
+            badge.style.color = this.isMuted ? "#ef4444" : "#10b981";
+            badge.style.borderColor = this.isMuted ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.3)";
+          } else if (status === "insecure_context") {
+            badge.innerText = "⚠️ HTTP Notice: Use text box or localhost on mobile";
+            badge.style.color = "#f59e0b";
+            badge.style.borderColor = "rgba(245,158,11,0.3)";
+          } else if (status === "permission_denied") {
+            badge.innerText = "❌ Mic Blocked in Browser Settings";
+            badge.style.color = "#ef4444";
+            badge.style.borderColor = "rgba(239,68,68,0.3)";
+          } else if (status === "unsupported") {
+            badge.innerText = "⚠️ Speech Recognition Not Supported";
+            badge.style.color = "#f59e0b";
+            badge.style.borderColor = "rgba(245,158,11,0.3)";
           }
         }
-      });
+      );
 
       if (initialized) {
         this.speechClient.start();
@@ -280,6 +307,13 @@ export class TranslationRoomPage {
         this.isMuted = !this.isMuted;
         muteBtn.innerText = this.isMuted ? "🔇 Unmute" : "🎙️ Mute";
         muteBtn.classList.toggle("speaking-pulse", !this.isMuted);
+
+        const badge = document.getElementById("mic-status-badge");
+        if (badge && !badge.innerText.includes("HTTP") && !badge.innerText.includes("Blocked")) {
+          badge.innerText = this.isMuted ? "🔇 Mic Muted" : "🎙️ Mic Active";
+          badge.style.color = this.isMuted ? "#ef4444" : "#10b981";
+          badge.style.borderColor = this.isMuted ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.3)";
+        }
       });
     }
 
