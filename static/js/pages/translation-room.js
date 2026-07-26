@@ -202,10 +202,10 @@ export class TranslationRoomPage {
 
     this.wsClient.on("caption", (data) => {
       if (data.is_final) {
-        // Mark that this speaker has a pending caption — translation event will show the final version
-        this._pendingCaptionSpeakers.add(data.speaker);
+        // Render final speech/text bubble on our own screen
+        this._appendFinalCaption(data.speaker, data.text, data.text, this.spokenLang);
         
-        // Save our own entry to local transcript array for history
+        // Save entry to local transcript array for history
         this.transcriptEntries.push({
           speaker: data.speaker,
           text: data.text,

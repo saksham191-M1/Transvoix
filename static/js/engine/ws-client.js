@@ -71,6 +71,10 @@ export class WebSocketClient {
           is_final: isFinal
         }
       }));
+      return true;
+    } else {
+      console.warn("Cannot send speech: WebSocket is not open. readyState:", this.ws ? this.ws.readyState : "null");
+      return false;
     }
   }
 
